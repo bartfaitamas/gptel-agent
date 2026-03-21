@@ -1502,9 +1502,10 @@ Error details: %S"
               (choice (nth sel-idx choices))
               (val (plist-get choice :value)))
     (gptel-agent--ask-teardown ov)
-    (if (string-match-p "\\b[Oo]ther\\b" val)
-        (let ((custom (read-string "Please specify: ")))
-          (funcall callback custom))
+    ;; Check if user selected "Custom" option
+    (if (string-equal val "Custom")
+        (let ((custom-response (read-string "Enter your custom response: ")))
+          (funcall callback custom-response))
       (funcall callback val))))
 
 (defun gptel-agent--ask-cancel ()
@@ -1516,9 +1517,16 @@ Error details: %S"
     (gptel-agent--ask-teardown ov)))
 
 (defun gptel-agent--ask-question (callback question choices)
-  "Ask user QUESTION with CHOICES, calling CALLBACK with result."
+  "Ask user QUESTION with CHOICES, calling CALLBACK with result.
+
+Always appends a custom option allowing the user to provide their own response."
   (let* ((choices-list (append choices nil))
-         (ui-text (gptel-agent--ask-draw-ui question choices-list 0))
+         ;; Always add a custom option at the end
+         (choices-with-custom
+          (append choices-list
+                  (list (list :value "Custom"
+                              :description "Provide your own custom response"))))
+         (ui-text (gptel-agent--ask-draw-ui question choices-with-custom 0))
          (inhibit-read-only t))
     (goto-char (point-max))
     (let ((start-pos (point)))
@@ -1528,10 +1536,10 @@ Error details: %S"
       (let ((ov (make-overlay start-pos (point))))
         (overlay-put ov 'gptel-ask t)
         (overlay-put ov 'gptel-ask--question question)
-        (overlay-put ov 'gptel-ask--choices choices-list)
+        (overlay-put ov 'gptel-ask--choices choices-with-custom)
         (overlay-put ov 'gptel-ask--selection 0)
         (overlay-put ov 'gptel-ask--callback callback)
-        (overlay-put ov 'keymap (gptel-agent--ask-make-keymap choices-list))
+        (overlay-put ov 'keymap (gptel-agent--ask-make-keymap choices-with-custom))
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'face (gptel-agent--block-bg))
         (overlay-put ov 'priority 1000)
@@ -1982,7 +1990,11 @@ displayed with numbered choices; the user selects one and you receive the
 selected value.
 
 CHOICES must contain objects with a `value' key. An optional `description'
-key provides additional context for each choice."
+key provides additional context for each choice.
+
+A \"Custom\" option is always automatically appended to the choices,
+allowing the user to provide their own free-text response if none of the
+predefined options are suitable."
  :args '(( :name "question"
            :type string
            :description "The question text to display to the user")
@@ -2002,7 +2014,11 @@ key provides additional context for each choice."
  :description "Ask the user multiple questions sequentially.
 
 Each question in QUESTIONS should have `question' and `choices' keys.
-CHOICES follows the same format as the Ask tool."
+CHOICES follows the same format as the Ask tool.
+
+A \"Custom\" option is always automatically appended to each question's
+choices, allowing the user to provide their own free-text response if
+none of the predefined options are suitable."
  :args '(( :name "questions"
            :type array
            :items (:type object
