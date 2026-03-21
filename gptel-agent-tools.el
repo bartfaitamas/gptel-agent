@@ -1438,7 +1438,7 @@ Error details: %S"
                         (concat "\n    "
                                 (propertize (string-fill desc wrap-width)
                                             'face 'font-lock-comment-face)))))))
-         (footer (propertize "\n [RET] Confirm [n] next [p] prev [1-9] Select  [C-c C-k] Cancel"
+         (footer (propertize "\n [RET] Confirm [n/p] Down/Up [1-9] Select  [C-c C-k] Cancel"
                              'face '(:inherit shadow :height 0.8)))
          (content (concat "\n" header "\n\n" (mapconcat #'identity choice-strs "\n") footer "\n")))
     (propertize content 'face (gptel-agent--block-bg))))
@@ -1538,7 +1538,11 @@ Always appends a custom option allowing the user to provide their own response."
         (overlay-put ov 'gptel-ask--question question)
         (overlay-put ov 'gptel-ask--choices choices-with-custom)
         (overlay-put ov 'gptel-ask--selection 0)
-        (overlay-put ov 'gptel-ask--callback callback)
+        ;; Wrap callback to format output as Q/R pair
+        (overlay-put ov 'gptel-ask--callback
+                     (lambda (answer)
+                       (funcall callback
+                                (format "Q: %s\nR: %s" question answer))))
         (overlay-put ov 'keymap (gptel-agent--ask-make-keymap choices-with-custom))
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'face (gptel-agent--block-bg))
@@ -1550,19 +1554,34 @@ Always appends a custom option allowing the user to provide their own response."
   "Ask user multiple QUESTIONS sequentially, calling CALLBACK with results."
   (let* ((qs (append questions nil))
          (results (make-hash-table :test 'equal))
+         (question-order nil)
          (total (length qs)))
     (cl-labels ((ask-next (idx)
                   (if (>= idx total)
-                      (funcall callback
-                               (format "User's Responses: %s"
-                                       (json-encode (hash-table-keys results))))
+                      ;; Format all Q&A pairs in order
+                      (let ((formatted-output
+                             (mapconcat
+                              (lambda (q-and-idx)
+                                (let* ((q (car q-and-idx))
+                                       (qnum (cdr q-and-idx)))
+                                  (format "Q%d: %s\nR%d: %s"
+                                          qnum q
+                                          qnum (gethash q results))))
+                              (nreverse question-order)
+                              "\n\n")))
+                        (funcall callback formatted-output))
                     (let* ((item (nth idx qs))
                            (q (plist-get item :question))
                            (c (plist-get item :choices)))
+                      (push (cons q (1+ idx)) question-order)
                       (gptel-agent--ask-question
                        (lambda (ans)
-                         (puthash q ans results)
-                         (ask-next (1+ idx)))
+                         ;; Extract just the answer from "Q: ...\nR: answer" format
+                         (let ((answer (if (string-match "\nR: \\(.*\\)" ans)
+                                           (match-string 1 ans)
+                                         ans)))
+                           (puthash q answer results)
+                           (ask-next (1+ idx))))
                        q (append c nil))))))
       (ask-next 0))))
 
