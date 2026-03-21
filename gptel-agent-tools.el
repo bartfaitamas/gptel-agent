@@ -1502,8 +1502,9 @@ Error details: %S"
               (choice (nth sel-idx choices))
               (val (plist-get choice :value)))
     (gptel-agent--ask-teardown ov)
-    ;; Check if user selected "Custom" option
-    (if (string-equal val "Custom")
+    ;; Treat the appended custom option (always the last in CHOICES)
+    ;; as the free-text sentinel, instead of relying on VAL being \"Custom\".
+    (if (= sel-idx (1- (length choices)))
         (let ((custom-response (read-string "Enter your custom response: ")))
           (funcall callback custom-response))
       (funcall callback val))))
