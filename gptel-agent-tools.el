@@ -1538,11 +1538,7 @@ Always appends a custom option allowing the user to provide their own response."
         (overlay-put ov 'gptel-ask--question question)
         (overlay-put ov 'gptel-ask--choices choices-with-custom)
         (overlay-put ov 'gptel-ask--selection 0)
-        ;; Wrap callback to format output as Q/R pair
-        (overlay-put ov 'gptel-ask--callback
-                     (lambda (answer)
-                       (funcall callback
-                                (format "Q: %s\nR: %s" question answer))))
+        (overlay-put ov 'gptel-ask--callback callback)
         (overlay-put ov 'keymap (gptel-agent--ask-make-keymap choices-with-custom))
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'face (gptel-agent--block-bg))
@@ -1575,13 +1571,9 @@ Always appends a custom option allowing the user to provide their own response."
                            (c (plist-get item :choices)))
                       (push (cons q (1+ idx)) question-order)
                       (gptel-agent--ask-question
-                       (lambda (ans)
-                         ;; Extract just the answer from "Q: ...\nR: answer" format
-                         (let ((answer (if (string-match "\nR: \\(.*\\)" ans)
-                                           (match-string 1 ans)
-                                         ans)))
-                           (puthash q answer results)
-                           (ask-next (1+ idx))))
+                       (lambda (answer)
+                         (puthash q answer results)
+                         (ask-next (1+ idx)))
                        q (append c nil))))))
       (ask-next 0))))
 
@@ -2001,39 +1993,12 @@ Should include exactly what information the agent should return."))
 
 (gptel-make-tool
  :name "Ask"
- :function #'gptel-agent--ask-question
- :description "Ask the user a single question with predefined choices.
-
-Use this tool when you need user input to proceed. The question will be
-displayed with numbered choices; the user selects one and you receive the
-selected value.
-
-CHOICES must contain objects with a `value' key. An optional `description'
-key provides additional context for each choice.
-
-A \"Custom\" option is always automatically appended to the choices,
-allowing the user to provide their own free-text response if none of the
-predefined options are suitable."
- :args '(( :name "question"
-           :type string
-           :description "The question text to display to the user")
-         ( :name "choices"
-           :type array
-           :items (:type object
-                   :properties (:value (:type string)
-                                :description (:type string))
-                   :required ["value"])))
- :category "gptel-agent"
- :async t
- :include t)
-
-(gptel-make-tool
- :name "AskMultiple"
  :function #'gptel-agent--ask-multiple
- :description "Ask the user multiple questions sequentially.
+ :description "Ask the user one or more questions sequentially.
 
 Each question in QUESTIONS should have `question' and `choices' keys.
-CHOICES follows the same format as the Ask tool.
+CHOICES must contain objects with a `value' key. An optional `description'
+key provides additional context for each choice.
 
 A \"Custom\" option is always automatically appended to each question's
 choices, allowing the user to provide their own free-text response if
