@@ -1389,6 +1389,132 @@ Error details: %S"
                    nil nil #'equal)
         setup-fn))
 
+;;; Ask tools (user interaction)
+
+(defun gptel-agent--ask-overlay-at-point ()
+  "Return the ask overlay at point, if any."
+  (seq-find (lambda (ov) (overlay-get ov 'gptel-ask))
+            (overlays-at (point))))
+
+(defun gptel-agent--ask-make-keymap (choices)
+  "Generate keymap for CHOICES interaction with number keys."
+  (let ((map (make-sparse-keymap))
+        (count (min 9 (length choices))))
+    (dotimes (i count)
+      (let ((idx i))
+        (define-key map (kbd (format "%d" (1+ i)))
+          (lambda () (interactive) (gptel-agent--ask-select-choice idx)))
+        (define-key map (kbd (format "<kp-%d>" (1+ i)))
+          (lambda () (interactive) (gptel-agent--ask-select-choice idx)))))
+    (define-key map (kbd "RET") 'gptel-agent--ask-confirm-choice)
+    (define-key map (kbd "<return>") 'gptel-agent--ask-confirm-choice)
+    (define-key map (kbd "TAB") 'gptel-agent--ask-cycle-choice)
+    (define-key map (kbd "<tab>") 'gptel-agent--ask-cycle-choice)
+    (define-key map (kbd "n") 'gptel-agent--ask-next-choice)
+    (define-key map (kbd "p") 'gptel-agent--ask-prev-choice)
+    (define-key map (kbd "C-c C-k") 'gptel-agent--ask-cancel)
+    map))
+
+(defun gptel-agent--ask-draw-ui (question choices selection)
+  "Return UI string for QUESTION and CHOICES with SELECTION highlighted."
+  (let* ((width (min (window-body-width) 80))
+         (wrap-width (- width 4))
+         (header (propertize (format " 🤖 AI ASKS: %s"
+                                     (shr-string-fill question wrap-width))
+                             'face 'font-lock-keyword-face))
+         (choice-strs
+          (cl-loop for choice in choices
+                   for idx from 0
+                   collect
+                   (let* ((selected (= idx selection))
+                          (val (or (plist-get choice :value) "Unknown"))
+                          (desc (plist-get choice :description))
+                          (mark (if selected " ● " " ○ "))
+                          (face (if selected '(:inherit highlight :weight bold) 'default)))
+                     (concat
+                      (propertize mark 'face face)
+                      (propertize (format "[%d] %s" (1+ idx) val) 'face face)
+                      (when (and desc (not (equal desc "")))
+                        (concat "\n    "
+                                (propertize (shr-string-fill desc wrap-width)
+                                            'face 'font-lock-comment-face)))))))
+         (footer (propertize "\n [RET] Confirm [n] next [p] prev [1-9] Select  [C-c C-k] Cancel"
+                             'face '(:inherit shadow :height 0.8)))
+         (content (concat "\n" header "\n\n" (mapconcat #'identity choice-strs "\n") footer "\n")))
+    (propertize content 'face (gptel-agent--block-bg))))
+
+(defun gptel-agent--ask-update-overlay (ov)
+  "Redraw overlay OV based on its current properties."
+  (let* ((question (overlay-get ov 'gptel-ask--question))
+         (choices (overlay-get ov 'gptel-ask--choices))
+         (selection (overlay-get ov 'gptel-ask--selection))
+         (new-text (gptel-agent--ask-draw-ui question choices selection))
+         (inhibit-read-only t)
+         (beg (overlay-start ov))
+         (end (overlay-end ov)))
+    (save-excursion
+      (goto-char beg)
+      (delete-region beg end)
+      (insert new-text)
+      (move-overlay ov beg (point)))))
+
+(defun gptel-agent--ask-select-choice (n)
+  "Select choice N and update display."
+  (interactive)
+  (when-let ((ov (gptel-agent--ask-overlay-at-point))
+             (choices (overlay-get ov 'gptel-ask--choices)))
+    (when (< n (length choices))
+      (overlay-put ov 'gptel-ask--selection n)
+      (gptel-agent--ask-update-overlay ov)
+      (let ((val (or (plist-get (nth n choices) :value) "Option")))
+        (message "Selected [%d]: %s" (1+ n) val)))))
+
+(defun gptel-agent--ask-cycle-choice (&optional prev)
+  "Cycle to next or PREV choice."
+  (interactive)
+  (when-let* ((ov (gptel-agent--ask-overlay-at-point))
+              (len (length (overlay-get ov 'gptel-ask--choices)))
+              (curr (overlay-get ov 'gptel-ask--selection)))
+    (let ((next (mod (+ curr (if prev -1 1)) len)))
+      (overlay-put ov 'gptel-ask--selection next)
+      (gptel-agent--ask-update-overlay ov))))
+
+(defun gptel-agent--ask-next-choice () (interactive) (gptel-agent--ask-cycle-choice))
+(defun gptel-agent--ask-prev-choice () (interactive) (gptel-agent--ask-cycle-choice t))
+
+(defun gptel-agent--ask-teardown (ov)
+  "Remove ask UI overlay OV completely."
+  (when (overlayp ov)
+    (let ((inhibit-read-only t)
+          (beg (overlay-start ov))
+          (end (overlay-end ov)))
+      (when (and beg end)
+        (delete-region beg end)))
+    (delete-overlay ov)))
+
+(defun gptel-agent--ask-confirm-choice ()
+  "Confirm selection and call callback."
+  (interactive)
+  (when-let* ((ov (gptel-agent--ask-overlay-at-point))
+              (callback (overlay-get ov 'gptel-ask--callback))
+              (choices (overlay-get ov 'gptel-ask--choices))
+              (sel-idx (overlay-get ov 'gptel-ask--selection))
+              (choice (nth sel-idx choices))
+              (val (plist-get choice :value)))
+    (gptel-agent--ask-teardown ov)
+    (if (string-match-p "\\b[Oo]ther\\b" val)
+        (let ((custom (read-string "Please specify: ")))
+          (funcall callback custom))
+      (funcall callback val))))
+
+(defun gptel-agent--ask-cancel ()
+  "Cancel ask interaction."
+  (interactive)
+  (when-let ((ov (gptel-agent--ask-overlay-at-point)))
+    (when-let ((cb (overlay-get ov 'gptel-ask--callback)))
+      (funcall cb "User cancelled interaction."))
+    (gptel-agent--ask-teardown ov)))
+
 ;;; All tool declarations
 
 (gptel-make-tool
