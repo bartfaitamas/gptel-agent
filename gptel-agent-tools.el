@@ -1418,7 +1418,7 @@ Error details: %S"
 (defun gptel-agent--ask-draw-ui (question choices selection)
   "Return UI string for QUESTION and CHOICES with SELECTION highlighted."
   (let* ((width (min (window-body-width) 80))
-         (wrap-width (- width 4))
+         (wrap-width (max 10 (- width 4)))
          (header (propertize (format " 🤖 AI ASKS: %s"
                                      (string-fill question wrap-width))
                              'face 'font-lock-keyword-face))
