@@ -1420,7 +1420,7 @@ Error details: %S"
   (let* ((width (min (window-body-width) 80))
          (wrap-width (- width 4))
          (header (propertize (format " 🤖 AI ASKS: %s"
-                                     (shr-string-fill question wrap-width))
+                                     (string-fill question wrap-width))
                              'face 'font-lock-keyword-face))
          (choice-strs
           (cl-loop for choice in choices
@@ -1436,7 +1436,7 @@ Error details: %S"
                       (propertize (format "[%d] %s" (1+ idx) val) 'face face)
                       (when (and desc (not (equal desc "")))
                         (concat "\n    "
-                                (propertize (shr-string-fill desc wrap-width)
+                                (propertize (string-fill desc wrap-width)
                                             'face 'font-lock-comment-face)))))))
          (footer (propertize "\n [RET] Confirm [n] next [p] prev [1-9] Select  [C-c C-k] Cancel"
                              'face '(:inherit shadow :height 0.8)))
@@ -1514,6 +1514,49 @@ Error details: %S"
     (when-let ((cb (overlay-get ov 'gptel-ask--callback)))
       (funcall cb "User cancelled interaction."))
     (gptel-agent--ask-teardown ov)))
+
+(defun gptel-agent--ask-question (callback question choices)
+  "Ask user QUESTION with CHOICES, calling CALLBACK with result."
+  (let* ((choices-list (append choices nil))
+         (ui-text (gptel-agent--ask-draw-ui question choices-list 0))
+         (inhibit-read-only t))
+    (goto-char (point-max))
+    (let ((start-pos (point)))
+      (unless (bolp) (insert "\n"))
+      (insert ui-text)
+      (insert "\n")
+      (let ((ov (make-overlay start-pos (point))))
+        (overlay-put ov 'gptel-ask t)
+        (overlay-put ov 'gptel-ask--question question)
+        (overlay-put ov 'gptel-ask--choices choices-list)
+        (overlay-put ov 'gptel-ask--selection 0)
+        (overlay-put ov 'gptel-ask--callback callback)
+        (overlay-put ov 'keymap (gptel-agent--ask-make-keymap choices-list))
+        (overlay-put ov 'evaporate t)
+        (overlay-put ov 'face (gptel-agent--block-bg))
+        (overlay-put ov 'priority 1000)
+        (goto-char (overlay-start ov))
+        (recenter)))))
+
+(defun gptel-agent--ask-multiple (callback questions)
+  "Ask user multiple QUESTIONS sequentially, calling CALLBACK with results."
+  (let* ((qs (append questions nil))
+         (results (make-hash-table :test 'equal))
+         (total (length qs)))
+    (cl-labels ((ask-next (idx)
+                  (if (>= idx total)
+                      (funcall callback
+                               (format "User's Responses: %s"
+                                       (json-encode (hash-table-keys results))))
+                    (let* ((item (nth idx qs))
+                           (q (plist-get item :question))
+                           (c (plist-get item :choices)))
+                      (gptel-agent--ask-question
+                       (lambda (ans)
+                         (puthash q ans results)
+                         (ask-next (1+ idx)))
+                       q (append c nil))))))
+      (ask-next 0))))
 
 ;;; All tool declarations
 
@@ -1927,6 +1970,50 @@ Should include exactly what information the agent should return."))
  :category "gptel-agent"
  :async t
  :confirm t
+ :include t)
+
+(gptel-make-tool
+ :name "Ask"
+ :function #'gptel-agent--ask-question
+ :description "Ask the user a single question with predefined choices.
+
+Use this tool when you need user input to proceed. The question will be
+displayed with numbered choices; the user selects one and you receive the
+selected value.
+
+CHOICES must contain objects with a `value' key. An optional `description'
+key provides additional context for each choice."
+ :args '(( :name "question"
+           :type string
+           :description "The question text to display to the user")
+         ( :name "choices"
+           :type array
+           :items (:type object
+                   :properties (:value (:type string)
+                                :description (:type string))
+                   :required ["value"])))
+ :category "gptel-agent"
+ :async t
+ :include t)
+
+(gptel-make-tool
+ :name "AskMultiple"
+ :function #'gptel-agent--ask-multiple
+ :description "Ask the user multiple questions sequentially.
+
+Each question in QUESTIONS should have `question' and `choices' keys.
+CHOICES follows the same format as the Ask tool."
+ :args '(( :name "questions"
+           :type array
+           :items (:type object
+                   :properties (:question (:type string)
+                                :choices (:type array
+                                          :items (:type object
+                                                  :properties (:value (:type string)
+                                                               :description (:type string))
+                                                  :required ["value"]))))))
+ :category "gptel-agent"
+ :async t
  :include t)
 
 (provide 'gptel-agent-tools)
