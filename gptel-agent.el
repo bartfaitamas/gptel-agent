@@ -96,7 +96,10 @@ for gptel sub-agent definitions by `gptel-agent'."
                                     "~/.opencode/skill/"
                                     ".opencode/skill/"
                                     "~/.gemini/skills/"
-                                    ".gemini/skills/")
+                                    ".gemini/skills/"
+                                    "~/.copilot/skills/"
+                                    ".github/skills/")
+
   "Agent skill definition directories.
 
 Each directory listed here should contain agent skills.  An agent skill
