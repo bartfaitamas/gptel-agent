@@ -214,6 +214,8 @@ ARG-VALUES is the list of arguments for the tool call."
         (from (point)) (inner-from))
     (insert
      "(" (propertize "Bash" 'font-lock-face 'font-lock-keyword-face)
+     " in " (propertize (abbreviate-file-name default-directory)
+                        'font-lock-face 'font-lock-string-face)
      ")\n")
     (setq inner-from (point))
     (insert command)
