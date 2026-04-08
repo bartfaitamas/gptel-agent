@@ -512,8 +512,8 @@ this session, which defaults to the default `gptel-agent'."
       (gptel--apply-preset              ;Apply the gptel-agent preset
        (or agent-preset 'gptel-agent)
        (lambda (sym val) (set (make-local-variable sym) val)))
-      (unless gptel-max-tokens          ;Agent tasks typically need
-        (setq gptel-max-tokens 8192))   ;a higher than usual value
+      (unless gptel-max-tokens              ;Agent tasks typically need
+        (setq-local gptel-max-tokens 8192)) ;a higher than usual value
       (when gptel-use-header-line
         (let* ((agent-mode t)
                (switch-mode
