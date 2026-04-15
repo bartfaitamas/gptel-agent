@@ -1502,7 +1502,7 @@ Error details: %S"
          (wrap-width (max 10 (- width 4)))
          (header (propertize (format " 🤖 AGENT ASKS: %s"
                                      (string-fill question wrap-width))
-                             'face 'font-lock-keyword-face))
+                             'font-lock-face 'font-lock-keyword-face))
          (choice-strs
           (cl-loop for choice in choices
                    for idx from 0
@@ -1514,14 +1514,15 @@ Error details: %S"
                           (mark (if selected " ● " " ○ "))
                           (face (if selected '(:inherit highlight :weight bold) 'default)))
                      (concat
-                      (propertize mark 'face face)
-                      (propertize (format "[%d] %s %s" (1+ idx) val (if reco "[RECOMMANDED]" "")) 'face face)
+                      (propertize mark 'font-lock-face face)
+                      (propertize (format "[%d] %s %s" (1+ idx) val (if reco "[RECOMMANDED]" "")) 'font-lock-face face)
                       (when (and desc (not (equal desc "")))
                         (concat "\n    "
                                 (propertize (string-fill desc wrap-width)
-                                            'face 'font-lock-comment-face)))))))
+                                            'font-lock-face 'font-lock-comment-face)))))))
          (footer (propertize "\n [RET] Confirm [n/p] Down/Up [1-9] Select  [C-c C-k] Cancel"
-                             'face '(:inherit shadow :height 0.8)))
+                             'font-lock-face '(:inherit shadow :height 0.8)))
+         gptel-agent--hrule
          (content (concat "\n" header "\n\n" (mapconcat #'identity choice-strs "\n") footer "\n")))
     content))
 
