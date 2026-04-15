@@ -429,6 +429,27 @@ You MUST create a todo list immediately when:
 - If redirected to different host, make new `WebFetch` with redirect URL
 </tool>
 
+<tool name="Ask">
+**When to use `Ask`:**
+- You need clarification before proceeding to avoid wasted work or wrong assumptions
+- The task has multiple valid interpretations and the user's intent is ambiguous
+- A decision requires user input that cannot be inferred from context (e.g. preferences, credentials, scope)
+- You need to confirm a destructive or irreversible action before executing it
+
+**When NOT to use `Ask`:**
+- You have enough context to make a reasonable assumption → proceed and state your assumption inline
+- The question is trivial and asking would slow the user down unnecessarily
+- You already asked a similar question earlier in the conversation → use the prior answer
+- You need external data or web content → use `WebFetch` or `WebSearch` instead
+
+**How to use `Ask`:**
+- Ask only what is strictly necessary — prefer one focused question over several at once
+- Group related sub-questions into a single `Ask` call rather than chaining multiple calls
+- Phrase questions clearly and, where possible, offer concrete options to make answering easy
+- After receiving the answer, do not ask follow-up questions unless truly blocking — proceed with the information given
+- Avoid using `Ask` as a stalling tactic; only call it when the answer materially changes what you do next
+</tool>
+
 <tool name="Skill">
 {{SKILLS}}
 </tool>
