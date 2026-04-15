@@ -56,6 +56,33 @@
 (defconst gptel-agent--hrule
   (propertize "\n" 'face '(:inherit shadow :underline t :extend t)))
 
+;;; Customizable variables
+(defcustom gptel-agent-read-file-size-threshold 400
+  "Maximum file size in KB above which the \"Read\" tool refuses to read
+the entire file and requires a line range.
+
+Default: 400 KB."
+  :type 'integer
+  :group 'gptel-agent)
+
+(defcustom gptel-agent-preset nil
+  "gptel preset to apply when calling sub-agents.
+
+If you want sub-agent calls to use a different backend or (typically
+smaller or cheaper) model from the main LLM in use, you can specify it
+here, along with any other gptel settings.
+
+It can specified as the name (a symbol) of a preset defined with
+`gptel-make-preset', or as a plist with preset keys like :backend and
+:model.  See this function for recognized keys and types.
+
+Note that you can also specify these parameters per-agent in the agent
+files, in the Markdown frontmatter or Org properties.  Agent-specific
+parameters take precedence over this value."
+  :type '(choice (symbol :tag "Name of preset")
+                 (plist  :tag "Preset plist spec"))
+  :group 'gptel-agent)
+
 ;;; Tool use preview
 (defun gptel-agent--confirm-overlay (from to &optional no-hide)
   "Set up tool call preview overlay FROM TO.
@@ -1017,16 +1044,16 @@ Raises an error if PATTERN is empty, PATH is not readable, or the
 
   (if (and (not start-line) (not end-line)) ;read full file
       (if (> (file-attribute-size (file-attributes filename))
-             (* 512 1024))
-          (error "Error: File is too large (> 512 KB).\
-Please specify a line range to read")
+             (* gptel-agent-read-file-size-threshold 1024))
+          (error "Error: File is too large (> %d KB).Please specify a line range to read"
+                 gptel-agent-read-file-size-threshold)
         (with-temp-buffer
           (insert-file-contents filename)
           (buffer-string)))
     ;; TODO: Handle nil start-line OR nil end-line
     (cl-decf start-line)
     (let* ((file-size (nth 7 (file-attributes filename)))
-           (chunk-size (min file-size (* 512 1024)))
+           (chunk-size (min file-size (* gptel-agent-read-file-size-threshold 1024)))
            (byte-offset 0) (line-offset (- end-line start-line)))
       (with-temp-buffer
         ;; Go to start-line
@@ -1078,14 +1105,37 @@ and optional context.  Results are limited to 1000 or fewer matches per
 file.  Results are sorted by modification time."
   (unless (file-readable-p path)
     (error "Error: File or directory %s is not readable" path))
-  (let ((grepper (or (executable-find "rg") (executable-find "grep"))))
-    (unless grepper
-      (error "Error: ripgrep/grep not available, this tool cannot be used"))
+  (let* ((full-path (expand-file-name (substitute-in-file-name path)))
+         (git-root (and (executable-find "git") (locate-dominating-file full-path ".git")))
+         (grepper (cond
+                   (git-root "git")
+                   ((executable-find "rg") "rg")
+                   ((executable-find "grep") "grep")
+                   (t (error "Error: ripgrep/grep/git-grep not available, \
+this tool cannot be used")))))
     (with-temp-buffer
-      (let* ((cmd (file-name-sans-extension (file-name-nondirectory grepper)))
+      (let* ((default-directory (or git-root default-directory))
              (args
               (cond
-               ((string= "rg" cmd)
+               ((string= "git" grepper)
+                (let* ((rel-path (file-relative-name full-path git-root))
+                       (pathspecs
+                        (list (if (and glob (file-directory-p full-path))
+                                  (file-name-concat rel-path glob)
+                                rel-path))))
+                  (delq nil
+                        (nconc
+                         (list "grep"
+                               "--line-number"
+                               "--no-color"
+                               (and (natnump context-lines)
+                                    (format "-C%d" context-lines))
+                               "--max-count=1000"
+                               "--untracked"
+                               "-P" regex
+                               "--")
+                         pathspecs))))
+               ((string= "rg" grepper)
                 (delq nil (list "--sort=modified"
                                 (and (natnump context-lines)
                                      (format "--context=%d" context-lines))
@@ -1093,20 +1143,20 @@ file.  Results are sorted by modification time."
                                 ;; "--files-with-matches"
                                 "--max-count=1000"
                                 "--heading" "--line-number" "-e" regex
-                                (expand-file-name (substitute-in-file-name path)))))
-               ((string= "grep" cmd)
+                                full-path)))
+               ((string= "grep" grepper)
                 (delq nil (list "--recursive"
                                 (and (natnump context-lines)
                                      (format "--context=%d" context-lines))
                                 (and glob (format "--include=%s" glob))
                                 "--max-count=1000"
                                 "--line-number" "--regexp" regex
-                                (expand-file-name (substitute-in-file-name path)))))
-               (t (error "Error: failed to identify grepper"))))
+                                full-path)))))
              (exit-code (apply #'call-process grepper nil '(t t) nil args)))
         (when (/= exit-code 0)
           (goto-char (point-min))
           (insert (format "Error: search failed with exit-code %d.  Tool output:\n\n" exit-code)))
+        (gptel-agent--truncate-buffer "grep")
         (buffer-string)))))
 
 ;;; Todo-write tool (task tracking)
@@ -1323,12 +1373,21 @@ ARG-VALUES is a list: (type description prompt)"
                 (cons (1- (point)) (point))
               (cons (line-beginning-position) (line-end-position)))))
          (ov (make-overlay (car bounds) (cdr bounds) nil t))
+         (model
+          (propertize (concat (gptel--model-name gptel-model))
+                      'face 'font-lock-comment-face))
          (msg (concat
                (unless (eq (char-after (car bounds)) 10) "\n")
                "\n" gptel-agent--hrule
                (propertize (concat (capitalize agent-type) " Task: ")
                            'face 'font-lock-escape-face)
-               (propertize description 'face 'font-lock-doc-face) "\n")))
+               (propertize description 'face 'font-lock-doc-face)
+               (propertize
+                " " 'display
+                (if (fboundp 'string-pixel-width)
+                    `(space :align-to (- right (,(string-pixel-width model))))
+                  `(space :align-to (- right ,(+ 5 (string-width model))))))
+               model "\n")))
     (prog1 ov
       (overlay-put ov 'gptel-agent t)
       (overlay-put ov 'count 0)
@@ -1349,8 +1408,13 @@ PROMPT is the detailed prompt instructing the agent on what is required."
   (gptel-with-preset
       (nconc (list :include-reasoning nil
                    :use-tools t
-                   :context nil)        ;Can be overriden by agent
-             (cdr (assoc agent-type gptel-agent--agents)))
+                   :context nil)       ;Can be overriden by agent
+              (and gptel-agent-preset
+                   (copy-sequence
+                    (cl-etypecase gptel-agent-preset
+                      (symbol (gptel-get-preset gptel-agent-preset))
+                      (plist gptel-agent-preset))))
+              (cdr (assoc agent-type gptel-agent--agents)))
     (let* ((info (gptel-fsm-info gptel--fsm-last))
            (where (or (plist-get info :tracking-marker)
                       (plist-get info :position)))
@@ -1878,14 +1942,15 @@ Use \"*\" to list all files in a directory.")
 
 (gptel-make-tool
  :name "Read"
- :description "Read file contents between specified line numbers `start_line` and `end_line`,
+ :description (format "Read file contents between specified line numbers `start_line` and `end_line`,
 with both ends included.
 
 Consider using the \"Grep\" tool to find the right range to read first.
 
 Reads the whole file if the line range is not provided.
 
-Files over 512 KB in size can only be read by specifying a line range."
+Files over %d KB in size can only be read by specifying a line range."
+                      gptel-agent-read-file-size-threshold)
  :function #'gptel-agent--read-file-lines
  :args '(( :name "file_path"
            :type string
