@@ -1522,7 +1522,7 @@ Error details: %S"
          (footer (propertize "\n [RET] Confirm [n/p] Down/Up [1-9] Select  [C-c C-k] Cancel"
                              'face '(:inherit shadow :height 0.8)))
          (content (concat "\n" header "\n\n" (mapconcat #'identity choice-strs "\n") footer "\n")))
-    (propertize content 'face (gptel-agent--block-bg))))
+    content))
 
 (defun gptel-agent--ask-update-overlay (ov)
   "Redraw overlay OV based on its current properties."
@@ -1623,7 +1623,6 @@ Always appends a custom option allowing the user to provide their own response."
         (overlay-put ov 'gptel-ask--callback callback)
         (overlay-put ov 'keymap (gptel-agent--ask-make-keymap choices-with-custom))
         (overlay-put ov 'evaporate t)
-        (overlay-put ov 'face (gptel-agent--block-bg))
         (overlay-put ov 'priority 1000)
         (goto-char (overlay-start ov))
         (recenter)))))
