@@ -3,6 +3,7 @@ name: gptel-agent
 description: The default gptel-agent
 tools:
   - Agent
+  - Ask
   - TodoWrite
   - Glob
   - Grep

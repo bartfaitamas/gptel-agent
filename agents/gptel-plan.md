@@ -6,6 +6,7 @@ description: >
   Does not execute changes - only creates comprehensive, actionable plans.
 tools:
   - Agent
+  - Ask
   - Glob
   - Grep
   - Read
