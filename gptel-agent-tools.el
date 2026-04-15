@@ -1500,7 +1500,7 @@ Error details: %S"
   "Return UI string for QUESTION and CHOICES with SELECTION highlighted."
   (let* ((width (min (window-body-width) 80))
          (wrap-width (max 10 (- width 4)))
-         (header (propertize (format " 🤖 AI ASKS: %s"
+         (header (propertize (format " 🤖 AGENT ASKS: %s"
                                      (string-fill question wrap-width))
                              'face 'font-lock-keyword-face))
          (choice-strs
@@ -1510,11 +1510,12 @@ Error details: %S"
                    (let* ((selected (= idx selection))
                           (val (or (plist-get choice :value) "Unknown"))
                           (desc (plist-get choice :description))
+                          (reco (plist-get choice :recommanded))
                           (mark (if selected " ● " " ○ "))
                           (face (if selected '(:inherit highlight :weight bold) 'default)))
                      (concat
                       (propertize mark 'face face)
-                      (propertize (format "[%d] %s" (1+ idx) val) 'face face)
+                      (propertize (format "[%d] %s %s" (1+ idx) val (if reco "[RECOMMANDED]" "")) 'face face)
                       (when (and desc (not (equal desc "")))
                         (concat "\n    "
                                 (propertize (string-fill desc wrap-width)
@@ -2081,7 +2082,8 @@ Should include exactly what information the agent should return."))
 
 Each question in QUESTIONS should have `question' and `choices' keys.
 CHOICES must contain objects with a `value' key. An optional `description'
-key provides additional context for each choice.
+key provides additional context for each choice. An optional `recommanded' key
+tells the user which choice is recommanded in this context.
 
 A \"Custom\" option is always automatically appended to each question's
 choices, allowing the user to provide their own free-text response if
@@ -2093,7 +2095,8 @@ none of the predefined options are suitable."
                                 :choices (:type array
                                           :items (:type object
                                                   :properties (:value (:type string)
-                                                               :description (:type string))
+                                                                      :description (:type string)
+                                                                      :recommanded (:type boolean))
                                                   :required ["value"]))))))
  :category "gptel-agent"
  :async t
