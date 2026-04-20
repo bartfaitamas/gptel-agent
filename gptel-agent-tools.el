@@ -2077,7 +2077,7 @@ Should include exactly what information the agent should return."))
  :include t)
 
 (gptel-make-tool
- :name "Ask"
+ :name "AskUserQuestion"
  :function #'gptel-agent--ask-multiple
  :description "Ask the user one or more questions sequentially.
 
