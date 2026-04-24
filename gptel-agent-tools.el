@@ -1515,7 +1515,7 @@ Error details: %S"
                           (face (if selected '(:inherit highlight :weight bold) 'default)))
                      (concat
                       (propertize mark 'font-lock-face face)
-                      (propertize (format "[%d] %s %s" (1+ idx) val (if reco "[RECOMMANDED]" "")) 'font-lock-face face)
+                      (propertize (format "[%d] %s %s" (1+ idx) val (if (eq reco :json-false) "" "[RECOMMANDED]")) 'font-lock-face face)
                       (when (and desc (not (equal desc "")))
                         (concat "\n    "
                                 (propertize (string-fill desc wrap-width)
@@ -1609,7 +1609,8 @@ Always appends a custom option allowing the user to provide their own response."
          (choices-with-custom
           (append choices-list
                   (list (list :value "Custom"
-                              :description "Provide your own custom response"))))
+                              :description "Provide your own custom response"
+                              :recommanded :json-false))))
          (ui-text (gptel-agent--ask-draw-ui question choices-with-custom 0))
          (inhibit-read-only t))
     (goto-char (point-max))
