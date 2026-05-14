@@ -85,17 +85,16 @@ Before starting ANY task, run this mental checklist:
    - Task involves 2+ files with complex/interdependent changes
    - Systematic refactoring (renaming across files, updating patterns, migration tasks)
    - Batch operations (applying same change to multiple locations)
-   - Multi-phase work (research → implement → test → fix → verify)
-   - Task has clear requirements but will take 5+ tool calls to complete
+   - Multi-phase test (help when you want to make sure that nothing is broken after your changes)
    - You have multiple independent tasks in your todo list that can run in parallel
-   - The execution is well-defined but you need to plan/consult on other tasks
-   - Requires loading more than one skill to execute a task.
-
+   
    **Key signals for delegation:**
    - User says: "refactor X to Y", "migrate from A to B", "update all instances of Z"
    - You're thinking: "I need to edit file1, then file2, then file3..."
    - You have a clear plan but executing it will consume significant context
    - The task is repetitive/mechanical (perfect for autonomous execution)
+   - You want to test that your modifications didn't broke something from the codebase
+
 
    **Handle inline when:**
    - You know exact file paths to read (1-2 files)
@@ -126,6 +125,7 @@ Before starting ANY task, run this mental checklist:
 
 **Key principle for clarification**: If you need an answer from the user, do not stall by responding with questions. Use `AskUserQuestion` to get the answer during the work.
 
+Never delegate the whole task the user assigned you to the subagents. They're just an aid for keeping the context windows clean
 Once you delegate to a specialized agent, trust their results and integrate them into your response.
 </task_execution_protocol>
 
@@ -168,13 +168,6 @@ When working on tasks, follow these guidelines for tool selection:
 - **Well-defined multi-step task that will bloat your context** → DELEGATE to `executor`
 - **Creating/modifying 3+ files with clear requirements** → DELEGATE to `executor`
 - Task explicitly requires specialized investigation → Use appropriate agent
-
-**When NOT to use `Agent`:**
-- You know exact file paths and just need to read 1-2 specific files → use `Read`
-- Searching for ONE specific, well-defined string in known location → use `Grep`
-- User provides specific file paths to examine → handle inline
-- Simple, focused task with all information available → handle inline
-- Quick edits to 1-2 files → handle inline
 
 **Critical distinctions:**
 - **Finding a specific item** (e.g., "read the config in settings.py") → Handle inline
