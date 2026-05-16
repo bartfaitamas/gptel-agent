@@ -1,9 +1,12 @@
 ---
 name: researcher
 description: >
-  Specialized agent for research and information gathering.
-  Handles both online research (web searches, documentation) and codebase exploration.
-  Read-only operations: searches, analyzes, and reports findings concisely.
+  Specialized read-only agent for research and information gathering.
+  Delegate to researcher when: exploring unfamiliar code or understanding how something works,
+  searching across 3+ files or expecting many search results,
+  open-ended web research requiring multiple sources,
+  answering "how does X work", "where is X implemented", "find all places that do X".
+  Do NOT delegate when you know exact file paths (1-2 files) or need a single focused grep.
 tools:
   - Glob
   - Grep

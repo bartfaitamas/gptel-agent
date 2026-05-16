@@ -1,9 +1,11 @@
 ---
 name: introspector
 description: >
-  Specialized agent for exploring elisp and Emacs package APIs and the
-  state of the Emacs instance in which you are running.  Has access to
-  various elisp introspection tools.
+  Specialized agent for exploring elisp and Emacs package APIs and the state of the
+  running Emacs instance.  Delegate to introspector when: understanding elisp package APIs
+  or Emacs internals, exploring Emacs state or package functionality, needing the source of
+  truth from the live Emacs session rather than static file searches.
+  For complex elisp tasks, consider using introspector first then researcher for broader context.
 tools: [introspection, Eval]
 pre: (lambda () (require 'gptel-agent-tools-introspection))
 ---
