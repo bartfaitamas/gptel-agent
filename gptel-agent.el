@@ -75,9 +75,7 @@
 (declare-function org-get-property-block "org")
 (declare-function org-entry-properties "org")
 (declare-function gptel-agent--update-skill-tool "gptel-agent-tools")
-(declare-function gptel-agent--skill-tool-base-desc "gptel-agent-tools")
-(declare-function gptel-tool-description "gptel-request")
-(declare-function gptel-agent--update-skill-tool "gptel-agent-tools")
+(declare-function gptel-agent--update-agent-tool "gptel-agent-tools")
 (declare-function gptel-agent--skill-tool-base-desc "gptel-agent-tools")
 (declare-function gptel-tool-description "gptel-request")
 (defvar org-inhibit-startup)
@@ -177,11 +175,12 @@ of the corresponding SKILL.md as a plist.")
 When nil, all discovered skills are considered enabled.
 Use `gptel-agent-toggle-skill' to manage this list interactively.")
 
-(defvar gptel-agent--enabled-skills nil
-  "List of currently enabled skill names.
+(defvar gptel-agent--enabled-agents nil
+  "List of currently enabled agent names.
 
-When nil, all discovered skills are considered enabled.
-Use `gptel-agent-toggle-skill' to manage this list interactively.")
+When nil, all discovered agents (except \"gptel-agent\" and
+\"gptel-plan\") are considered enabled.
+Use `gptel-agent-toggle-agent' to manage this list interactively.")
 
 ;;;###autoload
 (defun gptel-agent-read-file (agent-file &optional templates metadata-only)
@@ -287,38 +286,51 @@ AGENT-SKILLS is a alist of skill names and associated plist as value
                        skills "\n")
             "\n</available_skills>")))
 
+(defun gptel-agent--agents-tool-message (agents)
+  "Parse AGENTS and return the message describing available sub-agents.
+
+Only agents whose names are in `gptel-agent--enabled-agents' are
+included.  When `gptel-agent--enabled-agents' is nil, all agents
+except \"gptel-agent\" and \"gptel-plan\" are included.
+
+AGENTS is an alist of agent names and associated plist as value
+ (See `gptel-agent--agents').  The plist is expected to have
+:description as a key."
+  (let ((agents-list (if gptel-agent--enabled-agents
+                        (cl-remove-if-not
+                         (lambda (a) (member (car a) gptel-agent--enabled-agents))
+                         agents)
+                      (cl-remove-if
+                       (lambda (a)
+                         (member (car a) '("gptel-agent" "gptel-plan")))
+                       agents))))
+    (concat "Available sub-agents.  Use them when appropriate."
+            "\n<available_agents>\n"
+            (mapconcat (lambda (agent-def)
+                         (format "  <agent>
+    <name>%s</name>
+    <description>%s</description>
+  </agent>"
+                                 (car agent-def)
+                                 (plist-get (cdr agent-def) :description)))
+                       agents-list "\n")
+            "\n</available_agents>")))
+
 ;;;###autoload
 (defun gptel-agent-update ()
   "Update agents."
   (let ((agent-files (gptel-agent--update-agents)))
-    ;; reload agents with template expansion
     (dolist (agent-entry gptel-agent--agents)
       (let* ((name (car agent-entry))
-             (agent-file (cdr (assoc name agent-files)))
-             ;; Format the agent list for template substitution
-             (agents-list-str
-              (cl-loop for entry in gptel-agent--agents
-                       unless (or (string= (car entry) name)
-                                  (string= (car entry) "gptel-agent")
-                                  (string= (car entry) "gptel-plan"))
-                       collect (format "`%s`: %s\n"
-                                       (car entry) (plist-get (cdr entry) :description))
-                       into agent-list
-                       finally return (apply #'concat agent-list)))
-             ;; Create templates alist
-             (templates (list
-                         (cons "AGENTS" agents-list-str))))
-        (when agent-file                ; Parse the agent file with templates
+             (agent-file (cdr (assoc name agent-files))))
+        (when agent-file
           (setf (alist-get name gptel-agent--agents nil t #'equal)
-                (cdr (gptel-agent-read-file agent-file templates)))))))
+                (cdr (gptel-agent-read-file agent-file nil)))))))
 
-  ;; Update skills and the Skill tool
+  ;; Update skills and tools
   (gptel-agent--update-skills)
   (gptel-agent--update-skill-tool)
-
-  ;; Update the enum for Agent tool
-  (setf (plist-get (car (gptel-tool-args (gptel-get-tool "Agent"))) :enum)
-        (vconcat (delete "gptel-agent" (mapcar #'car gptel-agent--agents))))
+  (gptel-agent--update-agent-tool)
 
   ;; Apply gptel-agent preset if it exists
   (when-let* ((gptel-agent-plist (assoc-default "gptel-agent" gptel-agent--agents nil nil)))
@@ -326,6 +338,34 @@ AGENT-SKILLS is a alist of skill names and associated plist as value
   (when-let* ((gptel-plan-plist (assoc-default "gptel-plan" gptel-agent--agents nil nil)))
     (apply #'gptel-make-preset 'gptel-plan gptel-plan-plist))
   gptel-agent--agents)
+
+;;;###autoload
+(defun gptel-agent-toggle-agent ()
+  "Toggle which agents are enabled for the Agent tool.
+
+Prompts for agents to enable.  Agents not selected will be disabled.
+The Agent tool's description and enum are updated immediately without
+requiring `gptel-agent-update'."
+  (interactive)
+  (unless gptel-agent--agents
+    (gptel-agent--update-agents))
+  (let* ((all-agents (cl-remove-if
+                      (lambda (a)
+                        (member a '("gptel-agent" "gptel-plan")))
+                      (mapcar #'car gptel-agent--agents)))
+         (current (or gptel-agent--enabled-agents all-agents))
+         (selected
+          (completing-read-multiple
+           "Enable agents: "
+           (mapcar (lambda (a)
+                     (propertize a :annotation
+                                 (if (member a current) " [enabled]" " [disabled]")))
+                   all-agents)
+           nil t)))
+    (setq gptel-agent--enabled-agents selected)
+    (gptel-agent--update-agent-tool)
+    (message "Agents updated: %s enabled."
+             (length gptel-agent--enabled-agents))))
 
 ;;;###autoload
 (defun gptel-agent-toggle-skill ()

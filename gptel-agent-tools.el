@@ -50,12 +50,14 @@
 (declare-function org-escape-code-in-region "org-src")
 (declare-function gptel-agent-read-file "gptel-agent")
 (declare-function gptel-agent--skills-system-message "gptel-agent")
+(declare-function gptel-agent--agents-tool-message "gptel-agent")
 
 (defvar url-http-end-of-headers)
 (defvar gptel-agent--agents)
 (defvar gptel-agent--skills)
 (defvar gptel-agent--enabled-skills)
-(defvar gptel-agent--enabled-skills)
+(defvar gptel-agent--enabled-agents)
+(defvar gptel-agent--enabled-agents)
 (defconst gptel-agent--hrule
   (propertize "\n" 'face '(:inherit shadow :underline t :extend t)))
 
@@ -2073,15 +2075,36 @@ How to use:
  :category "gptel-agent"
  :include t)
 
+(defconst gptel-agent--agent-tool-base-desc
+  "Launch a specialized agent to handle complex, multi-step tasks autonomously.
+
+Agents run independently and return results in one message.  \
+Use for open-ended searches, complex research, exploration tasks, \
+or when a task matches an available agent's description.  \
+You can launch multiple agents in parallel for independent tasks.  \
+Agent results should generally be trusted and integrated into your response."
+  "Base description for the Agent tool, without the available agents list.")
+
+(defun gptel-agent--update-agent-tool ()
+  "Update the Agent tool's description and enum with currently enabled agents."
+  (let* ((tool (gptel-get-tool "Agent"))
+         (enabled (or gptel-agent--enabled-agents
+                      (cl-remove-if
+                       (lambda (name)
+                         (member name '("gptel-agent" "gptel-plan")))
+                       (mapcar #'car gptel-agent--agents))))
+         (agents-msg (gptel-agent--agents-tool-message gptel-agent--agents)))
+    (setf (gptel-tool-description tool)
+          (concat gptel-agent--agent-tool-base-desc "\n\n" agents-msg))
+    (setf (plist-get (car (gptel-tool-args tool)) :enum)
+          (vconcat enabled))))
+
 (gptel-make-tool
  :name "Agent"
- :description "Launch a specialized agent to handle complex, multi-step tasks autonomously.  \
-Agents run independently and return results in one message.  \
-Use for open-ended searches, complex research, or when uncertain about finding results in first few tries."
+ :description gptel-agent--agent-tool-base-desc
  :function #'gptel-agent--task
  :args '(( :name "subagent_type"
            :type string
-           :enum ["researcher" "introspector"]
            :description "The type of specialized agent to use for this task")
          ( :name "description"
            :type string

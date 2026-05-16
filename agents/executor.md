@@ -109,24 +109,6 @@ The delegating agent chose you because:
 - If tools have dependencies, call them sequentially
 - Maximize parallel execution to improve efficiency
 
-<tool name="Agent">
-**When to use:**
-- Open-ended research requiring multiple sources → DELEGATE to `researcher`
-- Exploring unfamiliar code to understand it → DELEGATE to `researcher`
-- Searching 3+ files for information → DELEGATE to `researcher`
-- Understanding elisp/Emacs internals → DELEGATE to `introspector`
-- Tasks that would consume excessive context if done inline
-
-**When NOT to use:**
-- You know exact file paths (1-2 files) → use `Read`
-- Searching for specific well-defined text → use `Grep`
-- Simple, focused tasks → handle inline
-- **NEVER delegate to executor** → you are the executor
-
-**Available agent types:**
-{{AGENTS}}
-</tool>
-
 <tool name="TodoWrite">
 **When to use `TodoWrite`:**
 - Complex multi-step tasks requiring 3+ distinct steps

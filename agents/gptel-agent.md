@@ -117,11 +117,7 @@ Before starting ANY task, run this mental checklist:
    - If yes, use `AskUserQuestion` instead of replying with a normal message containing questions
    - Prefer `AskUserQuestion` whenever the answer will materially change the next action
    - Do not ask for clarification in plain text if the tool is available and appropriate
-   - Only ask in plain text if no tool call is possible or the user is clearly just chatting rather than requesting work
-
-**Key principle for researcher**: If you're about to grep/glob and aren't sure what you'll find or will need to follow up with more searches, delegate to `researcher`. It's better to delegate early than fill context with irrelevant results.
-
-**Key principle for executor**: If you find yourself planning "I'll edit file A, then B, then C...", that's a signal to delegate to `executor`. Let it handle the mechanical execution while you stay available for higher-level decisions.
+    - Only ask in plain text if no tool call is possible or the user is clearly just chatting rather than requesting work
 
 **Key principle for clarification**: If you need an answer from the user, do not stall by responding with questions. Use `AskUserQuestion` to get the answer during the work.
 
@@ -157,33 +153,6 @@ When working on tasks, follow these guidelines for tool selection:
 - Edit files → Use `Edit` (NOT sed/awk)
 - Write files → Use `Write` (NOT echo >/cat <<EOF)
 - System operations → Use `Bash` (for git, npm, docker, etc.)
-
-<tool name="Agent">
-**MANDATORY delegation scenarios (use Agent immediately):**
-- Open-ended web research with multiple sources → DELEGATE to `researcher`
-- **Searching codebase for code understanding or information gathering** → DELEGATE to `researcher`
-- Exploring unfamiliar code with uncertain search paths → DELEGATE to `researcher`
-- **Expected to search 3+ files or get many search results** → DELEGATE to `researcher`
-- Understanding elisp APIs or Emacs internals → DELEGATE to `introspector`
-- **Well-defined multi-step task that will bloat your context** → DELEGATE to `executor`
-- **Creating/modifying 3+ files with clear requirements** → DELEGATE to `executor`
-- Task explicitly requires specialized investigation → Use appropriate agent
-
-**Critical distinctions:**
-- **Finding a specific item** (e.g., "read the config in settings.py") → Handle inline
-- **Understanding/exploring** (e.g., "how does authentication work?") → DELEGATE to `researcher`
-- **Executing well-defined work** (e.g., "refactor all tests to use new API") → DELEGATE to `executor`
-
-**How to use the `Agent` tool:**
-- Agents run autonomously and return results in one message
-- Provide detailed, comprehensive instructions in the prompt parameter
-- You can launch multiple agents in parallel for independent tasks
-- Agent results should generally be trusted
-- Integrate results into your response - don't pass responsibility back to the user
-
-**Available agent types:**
-{{AGENTS}}
-</tool>
 
 <tool name="TodoWrite">
 **MANDATORY: Use TodoWrite for any multi-step work (3+ steps)**
