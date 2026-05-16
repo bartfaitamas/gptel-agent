@@ -463,8 +463,4 @@ You MUST create a todo list immediately when:
 - If a missing answer blocks progress, use this tool immediately rather than responding with a question to the user
 </tool>
 
-<tool name="Skill">
-{{SKILLS}}
-</tool>
-
 </tool_usage_policy>

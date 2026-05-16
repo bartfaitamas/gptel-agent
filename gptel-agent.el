@@ -74,6 +74,12 @@
 (declare-function project-root "project")
 (declare-function org-get-property-block "org")
 (declare-function org-entry-properties "org")
+(declare-function gptel-agent--update-skill-tool "gptel-agent-tools")
+(declare-function gptel-agent--skill-tool-base-desc "gptel-agent-tools")
+(declare-function gptel-tool-description "gptel-request")
+(declare-function gptel-agent--update-skill-tool "gptel-agent-tools")
+(declare-function gptel-agent--skill-tool-base-desc "gptel-agent-tools")
+(declare-function gptel-tool-description "gptel-request")
 (defvar org-inhibit-startup)
 (defvar project-prompter)
 (defvar gptel-org-branching-context)
@@ -165,6 +171,18 @@ The key is the name.  The value is a cons (LOCATION . SKILL-PLIST).
 LOCATION is path to the skill's directory.  SKILL-PLIST is the header
 of the corresponding SKILL.md as a plist.")
 
+(defvar gptel-agent--enabled-skills nil
+  "List of currently enabled skill names.
+
+When nil, all discovered skills are considered enabled.
+Use `gptel-agent-toggle-skill' to manage this list interactively.")
+
+(defvar gptel-agent--enabled-skills nil
+  "List of currently enabled skill names.
+
+When nil, all discovered skills are considered enabled.
+Use `gptel-agent-toggle-skill' to manage this list interactively.")
+
 ;;;###autoload
 (defun gptel-agent-read-file (agent-file &optional templates metadata-only)
   "Read a preset/agent from AGENT-FILE.
@@ -243,33 +261,36 @@ Returns an alist of (agent-name . file-path)."
 (defun gptel-agent--skills-system-message (agent-skills)
   "Parse AGENT-SKILLS and return the message describing known skills.
 
-Meant to be used as a template (see `gptel-agent-read-file').
+Only skills whose names are in `gptel-agent--enabled-skills' are
+included.  When `gptel-agent--enabled-skills' is nil, all skills are
+included.
 
 AGENT-SKILLS is a alist of skill names and associated plist as value
  (See `gptel-agent--skills').  The plist is expected to have
 :description as a key."
-  ;; Copied from opencode
-  ;; (https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/tool/skill.ts)
-  (concat "Load a skill to get detailed instructions for a specific task."
-          "Skills provide specialized knowledge and step-by-step guidance."
-          "Use this when a task matches an available skill's description."
-          "\n<available_skills>\n"
-          (mapconcat (lambda (skill-def)
-                       (format "  <skill>
+  (let ((skills (if gptel-agent--enabled-skills
+                    (cl-remove-if-not
+                     (lambda (s) (member (car s) gptel-agent--enabled-skills))
+                     agent-skills)
+                  agent-skills)))
+    (concat "Load a skill to get detailed instructions for a specific task."
+            "Skills provide specialized knowledge and step-by-step guidance."
+            "Use this when a task matches an available skill's description."
+            "\n<available_skills>\n"
+            (mapconcat (lambda (skill-def)
+                         (format "  <skill>
     <name>%s</name>
     <description>%s</description>
   </skill>"
-                               (car skill-def)
-                               (plist-get (cddr skill-def) :description)))
-                     agent-skills "\n")
-          "\n</available_skills>"))
+                                 (car skill-def)
+                                 (plist-get (cddr skill-def) :description)))
+                       skills "\n")
+            "\n</available_skills>")))
 
 ;;;###autoload
 (defun gptel-agent-update ()
   "Update agents."
-  (let ((agent-files (gptel-agent--update-agents))
-        ;; Load skills to be included in the system message
-        (skills-str (gptel-agent--skills-system-message (gptel-agent--update-skills))))
+  (let ((agent-files (gptel-agent--update-agents)))
     ;; reload agents with template expansion
     (dolist (agent-entry gptel-agent--agents)
       (let* ((name (car agent-entry))
@@ -286,11 +307,14 @@ AGENT-SKILLS is a alist of skill names and associated plist as value
                        finally return (apply #'concat agent-list)))
              ;; Create templates alist
              (templates (list
-                         (cons "AGENTS" agents-list-str)
-                         (cons "SKILLS" skills-str))))
+                         (cons "AGENTS" agents-list-str))))
         (when agent-file                ; Parse the agent file with templates
           (setf (alist-get name gptel-agent--agents nil t #'equal)
                 (cdr (gptel-agent-read-file agent-file templates)))))))
+
+  ;; Update skills and the Skill tool
+  (gptel-agent--update-skills)
+  (gptel-agent--update-skill-tool)
 
   ;; Update the enum for Agent tool
   (setf (plist-get (car (gptel-tool-args (gptel-get-tool "Agent"))) :enum)
@@ -302,6 +326,31 @@ AGENT-SKILLS is a alist of skill names and associated plist as value
   (when-let* ((gptel-plan-plist (assoc-default "gptel-plan" gptel-agent--agents nil nil)))
     (apply #'gptel-make-preset 'gptel-plan gptel-plan-plist))
   gptel-agent--agents)
+
+;;;###autoload
+(defun gptel-agent-toggle-skill ()
+  "Toggle which skills are enabled for the Skill tool.
+
+Prompts for skills to enable.  Skills not selected will be disabled.
+The Skill tool's description and enum are updated immediately without
+requiring `gptel-agent-update'."
+  (interactive)
+  (unless gptel-agent--skills
+    (gptel-agent--update-skills))
+  (let* ((all-skills (mapcar #'car gptel-agent--skills))
+         (current (or gptel-agent--enabled-skills all-skills))
+         (selected
+          (completing-read-multiple
+           "Enable skills: "
+           (mapcar (lambda (s)
+                     (propertize s :annotation
+                                 (if (member s current) " [enabled]" " [disabled]")))
+                   all-skills)
+           nil t)))
+    (setq gptel-agent--enabled-skills selected)
+    (gptel-agent--update-skill-tool)
+    (message "Skills updated: %s enabled."
+             (length gptel-agent--enabled-skills))))
 
 ;;; Sub-agent definition parsers for Markdown and Org
 

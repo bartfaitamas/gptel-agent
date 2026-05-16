@@ -276,10 +276,6 @@ programmatically, so you must follow these guidelines carefully.
 - Avoid using `AskUserQuestion` as a stalling tactic; only call it when the answer materially changes what you do next
 </tool>
 
-
-<tool name="Skill">
-{{SKILLS}}
-</tool>
 </tool_usage_policy>
 
 <plan_output_format>

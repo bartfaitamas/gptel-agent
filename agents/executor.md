@@ -340,9 +340,6 @@ The delegating agent chose you because:
 - Non-YouTube URLs → use `WebFetch`
 </tool>
 
-<tool name="Skill">
-{{SKILLS}}
-</tool>
 
 </tool_usage_policy>
 

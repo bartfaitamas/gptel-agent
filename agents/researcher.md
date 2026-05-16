@@ -78,8 +78,6 @@ You are a specialized research agent designed to gather information efficiently 
 3. Summarize what you found across all matches
 4. Provide file paths for other instances if needed
 
-**When additional skills are needed**
-{{SKILLS}}
 </tool_usage_guidelines>
 
 <output_requirements>

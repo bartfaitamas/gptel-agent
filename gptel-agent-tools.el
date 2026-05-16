@@ -49,10 +49,13 @@
 
 (declare-function org-escape-code-in-region "org-src")
 (declare-function gptel-agent-read-file "gptel-agent")
+(declare-function gptel-agent--skills-system-message "gptel-agent")
 
 (defvar url-http-end-of-headers)
 (defvar gptel-agent--agents)
 (defvar gptel-agent--skills)
+(defvar gptel-agent--enabled-skills)
+(defvar gptel-agent--enabled-skills)
 (defconst gptel-agent--hrule
   (propertize "\n" 'face '(:inherit shadow :underline t :extend t)))
 
@@ -2025,9 +2028,8 @@ Only one todo can be `in_progress` at a time."
  :category "gptel-agent"
  :include nil)
 
-(gptel-make-tool
- :name "Skill"
- :description "Load a skill into the current conversation.
+(defconst gptel-agent--skill-tool-base-desc
+  "Load a skill into the current conversation.
 
 Each skill provides guidance on how to execute a specific task.
 You can invoke a skill with optional args, the args are for your future reference only.
@@ -2044,6 +2046,22 @@ How to use:
     - `skill: \"pdf\"` - invoke the pdf skill
     - `skill: \"commit\", args: \"-m 'Fix bug'\"` - invoke with arguments
     - `skill: \"review-pr\", args: \"123\"` - invoke with arguments"
+  "Base description for the Skill tool, without the available skills list.")
+
+(defun gptel-agent--update-skill-tool ()
+  "Update the Skill tool's description and enum with currently enabled skills."
+  (let* ((tool (gptel-get-tool "Skill"))
+         (enabled (or gptel-agent--enabled-skills
+                      (mapcar #'car gptel-agent--skills)))
+         (skills-msg (gptel-agent--skills-system-message gptel-agent--skills)))
+    (setf (gptel-tool-description tool)
+          (concat gptel-agent--skill-tool-base-desc "\n\n" skills-msg))
+    (setf (plist-get (car (gptel-tool-args tool)) :enum)
+          (vconcat enabled))))
+
+(gptel-make-tool
+ :name "Skill"
+ :description gptel-agent--skill-tool-base-desc
  :function #'gptel-agent--get-skill
  :args '(( :name "skill"
            :type string
