@@ -2091,7 +2091,7 @@ Agent results should generally be trusted and integrated into your response."
          (enabled (or gptel-agent--enabled-agents
                       (cl-remove-if
                        (lambda (name)
-                         (member name '("gptel-agent" "gptel-plan")))
+                         (member name '("gptel-agent" "gptel-plan" "ask")))
                        (mapcar #'car gptel-agent--agents))))
          (agents-msg (gptel-agent--agents-tool-message gptel-agent--agents)))
     (setf (gptel-tool-description tool)

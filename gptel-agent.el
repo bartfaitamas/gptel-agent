@@ -302,7 +302,7 @@ AGENTS is an alist of agent names and associated plist as value
                          agents)
                       (cl-remove-if
                        (lambda (a)
-                         (member (car a) '("gptel-agent" "gptel-plan")))
+                         (member (car a) '("gptel-agent" "gptel-plan" "ask")))
                        agents))))
     (concat "Available sub-agents.  Use them when appropriate."
             "\n<available_agents>\n"
@@ -337,6 +337,8 @@ AGENTS is an alist of agent names and associated plist as value
     (apply #'gptel-make-preset 'gptel-agent gptel-agent-plist))
   (when-let* ((gptel-plan-plist (assoc-default "gptel-plan" gptel-agent--agents nil nil)))
     (apply #'gptel-make-preset 'gptel-plan gptel-plan-plist))
+  (when-let* ((ask-plist (assoc-default "ask" gptel-agent--agents nil nil)))
+    (apply #'gptel-make-preset 'ask ask-plist))
   gptel-agent--agents)
 
 ;;;###autoload
@@ -351,7 +353,7 @@ requiring `gptel-agent-update'."
     (gptel-agent--update-agents))
   (let* ((all-agents (cl-remove-if
                       (lambda (a)
-                        (member a '("gptel-agent" "gptel-plan")))
+                        (member a '("gptel-agent" "gptel-plan" "ask")))
                       (mapcar #'car gptel-agent--agents)))
          (current (or gptel-agent--enabled-agents all-agents))
          (selected
@@ -723,25 +725,28 @@ this session, which defaults to the default `gptel-agent'."
       (unless gptel-max-tokens              ;Agent tasks typically need
         (setq-local gptel-max-tokens 8192)) ;a higher than usual value
       (when gptel-use-header-line
-        (let* ((agent-mode t)
+        (let* ((modes '((gptel-agent "[Agent]" font-lock-keyword-face
+                                     "Switch to planning preset")
+                        (gptel-plan  "[Plan]"  font-lock-doc-face
+                                     "Switch to ask preset")
+                        (ask         "[Ask]"   font-lock-string-face
+                                     "Switch to agent preset")))
+               (current 0)
                (switch-mode
                 (lambda (&rest _)
+                  (setq current (mod (1+ current) (length modes)))
                   (gptel--apply-preset
-                   (if agent-mode 'gptel-plan 'gptel-agent)
+                   (car (nth current modes))
                    (lambda (sym val) (set (make-local-variable sym) val)))
-                  (setq agent-mode (not agent-mode))
                   (force-mode-line-update)))
                (display-mode
-                (lambda () (concat
-                       (propertize " " 'display '(space :align-to 0))
-                       (format "%s" (gptel-backend-name gptel-backend))
-                       (if agent-mode
-                           (propertize (buttonize "[Agent]" switch-mode nil
-                                                  "Switch to planning preset")
-                                       'face 'font-lock-keyword-face)
-                         (propertize (buttonize "[Plan]" switch-mode nil
-                                                "Switch to agent preset")
-                                     'face 'font-lock-doc-face))))))
+                (lambda ()
+                  (pcase-let ((`(,_ ,label ,face ,help) (nth current modes)))
+                    (concat
+                     (propertize " " 'display '(space :align-to 0))
+                     (format "%s" (gptel-backend-name gptel-backend))
+                     (propertize (buttonize label switch-mode nil help)
+                                 'face face))))))
           (setcar header-line-format
                   `(:eval (funcall ,display-mode))))))))
 
