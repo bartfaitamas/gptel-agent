@@ -357,11 +357,8 @@ requiring `gptel-agent-update'."
          (selected
           (completing-read-multiple
            "Enable agents: "
-           (mapcar (lambda (a)
-                     (propertize a :annotation
-                                 (if (member a current) " [enabled]" " [disabled]")))
-                   all-agents)
-           nil t)))
+           all-agents nil t
+           (mapconcat #'identity current ","))))
     (setq gptel-agent--enabled-agents selected)
     (gptel-agent--update-agent-tool)
     (message "Agents updated: %s enabled."
@@ -382,11 +379,8 @@ requiring `gptel-agent-update'."
          (selected
           (completing-read-multiple
            "Enable skills: "
-           (mapcar (lambda (s)
-                     (propertize s :annotation
-                                 (if (member s current) " [enabled]" " [disabled]")))
-                   all-skills)
-           nil t)))
+           all-skills nil t
+           (mapconcat #'identity current ","))))
     (setq gptel-agent--enabled-skills selected)
     (gptel-agent--update-skill-tool)
     (message "Skills updated: %s enabled."
