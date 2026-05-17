@@ -1515,12 +1515,14 @@ Error details: %S"
                    (let* ((selected (= idx selection))
                           (val (or (plist-get choice :value) "Unknown"))
                           (desc (plist-get choice :description))
-                          (reco (plist-get choice :recommanded))
+                          (reco (plist-get choice :recommended))
                           (mark (if selected " ● " " ○ "))
                           (face (if selected '(:inherit highlight :weight bold) 'default)))
                      (concat
                       (propertize mark 'font-lock-face face)
-                      (propertize (format "[%d] %s %s" (1+ idx) val (if (eq reco :json-false) "" "[RECOMMANDED]")) 'font-lock-face face)
+                                  (propertize (format "[%d] %s%s" (1+ idx) val
+                                                      (if (and reco (not (eq reco :json-false)))
+                                                          " [RECOMMENDED]" "")) 'font-lock-face face)
                       (when (and desc (not (equal desc "")))
                         (concat "\n    "
                                 (propertize (string-fill desc wrap-width)
@@ -1615,7 +1617,7 @@ Always appends a custom option allowing the user to provide their own response."
           (append choices-list
                   (list (list :value "Custom"
                               :description "Provide your own custom response"
-                              :recommanded :json-false))))
+                              :recommended :json-false))))
          (ui-text (gptel-agent--ask-draw-ui question choices-with-custom 0))
          (inhibit-read-only t))
     (goto-char (point-max))
@@ -2125,8 +2127,8 @@ Should include exactly what information the agent should return."))
 
 Each question in QUESTIONS should have `question' and `choices' keys.
 CHOICES must contain objects with a `value' key. An optional `description'
-key provides additional context for each choice. An optional `recommanded' key
-tells the user which choice is recommanded in this context.
+key provides additional context for each choice. An optional `recommended' key
+tells the user which choice is recommended in this context.
 
 A \"Custom\" option is always automatically appended to each question's
 choices, allowing the user to provide their own free-text response if
@@ -2139,7 +2141,7 @@ none of the predefined options are suitable."
                                           :items (:type object
                                                   :properties (:value (:type string)
                                                                       :description (:type string)
-                                                                      :recommanded (:type boolean))
+                                                                      :recommended (:type boolean))
                                                   :required ["value"]))))))
  :category "gptel-agent"
  :async t
