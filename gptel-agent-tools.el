@@ -1951,8 +1951,8 @@ Use \"*\" to list all files in a directory.")
 
 (gptel-make-tool
  :name "Read"
- :description (format "Read file contents between specified line numbers `start_line` and `end_line`,
-with both ends included.
+ :description (format "Read textual files' contents between specified line numbers `start_line` and `end_line`,
+with both ends included. Use only on human readable textual files
 
 Consider using the \"Grep\" tool to find the right range to read first.
 
